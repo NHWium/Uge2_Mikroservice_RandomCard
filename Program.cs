@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.Mvc;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
@@ -34,7 +36,7 @@ app.MapGet("/deck/card/next", (IDeckOfCards deck) =>
 });
 
 // Gets a specific card from the deck, without modifying the deck.
-app.MapGet("/deck/card/", (CardNumber number, CardSuit suit, IDeckOfCards deck) =>
+app.MapGet("/deck/card/", ([FromQuery] CardNumber number, [FromQuery] CardSuit suit, IDeckOfCards deck) =>
 {
     var card = deck.Cards.Find(c => c.Equals(new Card(number, suit)));
     if (card is not null) return Results.Ok(new Message(card.Text, card, deck));
@@ -72,9 +74,11 @@ app.MapPut("/deck/card/next", (IDeckOfCards deck) =>
 });
 
 // Draws a specific card from the deck, modifying the deck.
-app.MapPut("/deck/card", (Card card, IDeckOfCards deck) =>
+app.MapPut("/deck/card", ([FromQuery] CardNumber number, [FromQuery] CardSuit suit, IDeckOfCards deck) =>
 {
-    if ((card.Suit == CardSuit.Joker && deck.Cards.Where(c => c.Equals(card)).Count() >= 3)
+    var card = deck.Cards.Find(c => c.Equals(new Card(number, suit)));
+    if (card is null) return Results.NotFound(new Message("Card not found", new Card(number, suit), deck));
+    else if ((suit == CardSuit.Joker && deck.Cards.Where(c => c.Equals(card)).Count() >= 3)
        || !deck.Cards.Contains(card))
     {
         deck.AddCard(card);
@@ -128,7 +132,15 @@ public record Card (CardNumber Number, CardSuit Suit)
         else return $"{Number} of {Suit}s";
     }
 }
+
+/// <summary>
+/// An enum representing the four suits of cards, as well as jokers without a suit.
+/// </summary>
 public enum CardSuit { Joker, Heart, Diamond, Club, Spade };
+
+/// <summary>
+/// An enum representing the content of a suit of cards, the numbers and picture cards, as well as the jokers.
+/// </summary>
 public enum CardNumber { Joker, Ace, Two, Three, Four, Five, Six, Seven, Eight, Nine, Ten, Jack, Queen, King };
 
 /// <summary>
@@ -177,6 +189,7 @@ public interface IDeckOfCards
     List<Card> Shuffle();
 }
 
+/// <inheritdoc />
 public class DeckOfCards : IDeckOfCards
 {
     private List<Card> cards;
@@ -247,4 +260,10 @@ public class DeckOfCards : IDeckOfCards
     }
 }
 
+/// <summary>
+/// A quick record to aid in return messages.
+/// </summary>
+/// <param name="message">The message to return</param>
+/// <param name="card">Any relevant card found or given</param>
+/// <param name="deck">The state of the deck of cards</param>
 public record Message (string message, Card? card, IDeckOfCards? deck);
